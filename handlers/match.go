@@ -170,53 +170,49 @@ func AddRatings(c *gin.Context) {
 	userID, _ := primitive.ObjectIDFromHex(userIdValue.(string))
 	rating.OwnerID = userID
 
-	roleValue, _ := c.Get("role")
-	role, _ := roleValue.(string)
-
 	collection := config.DB.Collection("matches")
 
-	if role == "player" {
-		playerIdValue, exists := c.Get("playerId")
-		if !exists {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Player context required"})
+	// All users must be linked to a player and be in the match lineup to rate
+	playerIdValue, exists := c.Get("playerId")
+	if !exists {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You must be linked to a player account to rate matches"})
+		return
+	}
+	playerIDHex, _ := playerIdValue.(string)
+	playerObjID, err := primitive.ObjectIDFromHex(playerIDHex)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid player ID in token"})
+		return
+	}
+
+	var match models.Match
+	if err := collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&match); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Match not found"})
+		return
+	}
+
+	lineupSet := make(map[string]bool)
+	inLineup := false
+	for _, entry := range match.Lineup {
+		lineupSet[entry.PlayerID.Hex()] = true
+		if entry.PlayerID == playerObjID {
+			inLineup = true
+		}
+	}
+
+	if !inLineup {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not in the lineup for this match"})
+		return
+	}
+
+	for _, score := range rating.Scores {
+		if !lineupSet[score.PlayerID.Hex()] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Rating contains a player not in the lineup"})
 			return
 		}
-		playerIDHex, _ := playerIdValue.(string)
-		playerObjID, err := primitive.ObjectIDFromHex(playerIDHex)
-		if err != nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid player ID in token"})
+		if score.PlayerID == playerObjID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Players cannot rate themselves"})
 			return
-		}
-
-		var match models.Match
-		if err := collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&match); err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Match not found"})
-			return
-		}
-
-		lineupSet := make(map[string]bool)
-		inLineup := false
-		for _, entry := range match.Lineup {
-			lineupSet[entry.PlayerID.Hex()] = true
-			if entry.PlayerID == playerObjID {
-				inLineup = true
-			}
-		}
-
-		if !inLineup {
-			c.JSON(http.StatusForbidden, gin.H{"error": "You are not in the lineup for this match"})
-			return
-		}
-
-		for _, score := range rating.Scores {
-			if !lineupSet[score.PlayerID.Hex()] {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Rating contains a player not in the lineup"})
-				return
-			}
-			if score.PlayerID == playerObjID {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Players cannot rate themselves"})
-				return
-			}
 		}
 	}
 
