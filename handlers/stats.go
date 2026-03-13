@@ -57,11 +57,13 @@ func GetPlayerStats(c *gin.Context) {
 
 		// Calculate goals & assists
 		for _, event := range match.Events {
-			if event.Type == "goal" && event.PlayerID == playerID {
-				stats.Goals++
-			}
-			if event.Type == "assist" && event.AssistPlayerID == playerID {
-				stats.Assists++
+			if event.Type == "goal" {
+				if event.PlayerID == playerID {
+					stats.Goals++
+				}
+				if event.AssistPlayerID == playerID {
+					stats.Assists++
+				}
 			}
 		}
 
