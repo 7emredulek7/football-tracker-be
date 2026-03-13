@@ -126,6 +126,20 @@ func DeletePlayer(c *gin.Context) {
 	}
 
 	collection := config.DB.Collection("players")
+
+	// Find the player to check for a linked user account
+	var player models.Player
+	if err := collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&player); err == nil {
+		usersCollection := config.DB.Collection("users")
+
+		// Find linked non-owner user (match by playerId field on user)
+		var linkedUser models.User
+		err := usersCollection.FindOne(context.Background(), bson.M{"playerId": objectID}).Decode(&linkedUser)
+		if err == nil && linkedUser.Role != "owner" {
+			usersCollection.DeleteOne(context.Background(), bson.M{"_id": linkedUser.ID})
+		}
+	}
+
 	res, err := collection.DeleteOne(context.Background(), bson.M{"_id": objectID})
 	if err != nil || res.DeletedCount == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete player"})
