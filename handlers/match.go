@@ -213,6 +213,10 @@ func AddRatings(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Rating contains a player not in the lineup"})
 				return
 			}
+			if score.PlayerID == playerObjID {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Players cannot rate themselves"})
+				return
+			}
 		}
 	}
 

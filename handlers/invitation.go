@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -71,7 +72,7 @@ func CreateInvitation(c *gin.Context) {
 		return
 	}
 
-	frontendURL := os.Getenv("FRONTEND_URL")
+	frontendURL := strings.TrimRight(os.Getenv("FRONTEND_URL"), "/")
 	inviteURL := frontendURL + "/register?token=" + tokenStr
 
 	c.JSON(http.StatusCreated, gin.H{
