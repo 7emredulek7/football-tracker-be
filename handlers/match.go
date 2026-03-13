@@ -162,29 +162,67 @@ func AddRatings(c *gin.Context) {
 		return
 	}
 
-	// Make sure OwnerID is set
-	ownerIdValue, exists := c.Get("userId")
+	userIdValue, exists := c.Get("userId")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	ownerID, _ := primitive.ObjectIDFromHex(ownerIdValue.(string))
-	rating.OwnerID = ownerID
+	userID, _ := primitive.ObjectIDFromHex(userIdValue.(string))
+	rating.OwnerID = userID
+
+	roleValue, _ := c.Get("role")
+	role, _ := roleValue.(string)
 
 	collection := config.DB.Collection("matches")
 
-	// First check if this owner has already voted
-	// If MVP doesn't need to prevent double votes perfectly, we can just push.
-	// But let's just push for simplicity, or we can use $pull to remove old vote then $push
+	if role == "player" {
+		playerIdValue, exists := c.Get("playerId")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Player context required"})
+			return
+		}
+		playerIDHex, _ := playerIdValue.(string)
+		playerObjID, err := primitive.ObjectIDFromHex(playerIDHex)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid player ID in token"})
+			return
+		}
 
-	// remove old rating from this owner
+		var match models.Match
+		if err := collection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&match); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Match not found"})
+			return
+		}
+
+		lineupSet := make(map[string]bool)
+		inLineup := false
+		for _, entry := range match.Lineup {
+			lineupSet[entry.PlayerID.Hex()] = true
+			if entry.PlayerID == playerObjID {
+				inLineup = true
+			}
+		}
+
+		if !inLineup {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not in the lineup for this match"})
+			return
+		}
+
+		for _, score := range rating.Scores {
+			if !lineupSet[score.PlayerID.Hex()] {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Rating contains a player not in the lineup"})
+				return
+			}
+		}
+	}
+
+	// Remove old rating from this user then push new
 	_, _ = collection.UpdateOne(
 		context.Background(),
 		bson.M{"_id": objectID},
-		bson.M{"$pull": bson.M{"ratings": bson.M{"ownerId": ownerID}}},
+		bson.M{"$pull": bson.M{"ratings": bson.M{"ownerId": userID}}},
 	)
 
-	// push new rating
 	update := bson.M{
 		"$push": bson.M{
 			"ratings": rating,

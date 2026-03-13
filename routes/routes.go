@@ -18,13 +18,22 @@ func SetupRoutes(r *gin.Engine) {
 	{
 		// Public
 		api.POST("/auth/login", handlers.Login)
+		api.POST("/auth/register", handlers.RegisterWithInvitation)
 		api.GET("/players", handlers.GetPlayers)
 		api.GET("/matches", handlers.GetMatches)
 		api.GET("/matches/:id", handlers.GetMatchByID)
 		api.GET("/settings", handlers.GetSettings)
 		api.GET("/stats/player/:id", handlers.GetPlayerStats)
+		api.GET("/invitations/:token", handlers.GetInvitation)
 
-		// Owner
+		// Any authenticated user (owner or player)
+		anyAuth := api.Group("/")
+		anyAuth.Use(middleware.AnyAuthMiddleware())
+		{
+			anyAuth.POST("/matches/:id/ratings", handlers.AddRatings)
+		}
+
+		// Owner only
 		owner := api.Group("/")
 		owner.Use(middleware.AuthMiddleware())
 		{
@@ -36,9 +45,10 @@ func SetupRoutes(r *gin.Engine) {
 			owner.PUT("/matches/:id", handlers.UpdateMatch)
 			owner.DELETE("/matches/:id", handlers.DeleteMatch)
 			owner.POST("/matches/:id/events", handlers.AddEvents)
-			owner.POST("/matches/:id/ratings", handlers.AddRatings)
 
 			owner.PUT("/settings/default-lineup", handlers.UpdateSettings)
+
+			owner.POST("/invitations", handlers.CreateInvitation)
 		}
 	}
 }

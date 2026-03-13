@@ -38,7 +38,11 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateToken(user.ID.Hex(), user.Role)
+	playerIDHex := ""
+	if user.PlayerID != nil {
+		playerIDHex = user.PlayerID.Hex()
+	}
+	token, err := utils.GenerateToken(user.ID.Hex(), user.Role, playerIDHex)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
 		return

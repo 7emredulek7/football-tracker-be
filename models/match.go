@@ -13,7 +13,7 @@ type MatchEvent struct {
 }
 
 type MatchRating struct {
-	OwnerID primitive.ObjectID `bson:"ownerId" json:"ownerId"`
+	OwnerID primitive.ObjectID `bson:"ownerId" json:"userId"`
 	Scores  []PlayerScore      `bson:"scores" json:"scores"`
 }
 

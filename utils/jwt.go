@@ -15,12 +15,15 @@ var GetJWTSecret = func() []byte {
 	return []byte(secret)
 }
 
-func GenerateToken(userID string, role string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+func GenerateToken(userID string, role string, playerID string) (string, error) {
+	claims := jwt.MapClaims{
 		"userId": userID,
 		"role":   role,
 		"exp":    time.Now().Add(time.Hour * 72).Unix(),
-	})
-
+	}
+	if playerID != "" {
+		claims["playerId"] = playerID
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(GetJWTSecret())
 }
