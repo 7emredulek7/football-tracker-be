@@ -42,7 +42,7 @@ func GetPlayerStats(c *gin.Context) {
 	}
 
 	var stats PlayerStats
-	var totalRating int
+	var totalRating float64
 	var ratingCount int
 
 	for _, match := range matches {
@@ -79,14 +79,14 @@ func GetPlayerStats(c *gin.Context) {
 			}
 
 			if matchScoreCount > 0 {
-				totalRating += matchScoreTotal / matchScoreCount
+				totalRating += float64(matchScoreTotal) / float64(matchScoreCount)
 				ratingCount++
 			}
 		}
 	}
 
 	if ratingCount > 0 {
-		stats.AverageRating = float64(totalRating) / float64(ratingCount)
+		stats.AverageRating = totalRating / float64(ratingCount)
 	}
 
 	c.JSON(http.StatusOK, stats)
