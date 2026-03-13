@@ -37,6 +37,8 @@ func SetupRoutes(r *gin.Engine) {
 		owner := api.Group("/")
 		owner.Use(middleware.AuthMiddleware())
 		{
+			owner.PUT("/auth/link-player/:playerId", handlers.LinkOwnerToPlayer)
+
 			owner.POST("/players", handlers.CreatePlayer)
 			owner.PUT("/players/:id", handlers.UpdatePlayer)
 			owner.DELETE("/players/:id", handlers.DeletePlayer)

@@ -7,9 +7,8 @@ import (
 )
 
 type MatchEvent struct {
-	Type           string             `bson:"type" json:"type"` // "goal", "assist"
-	PlayerID       primitive.ObjectID `bson:"playerId" json:"playerId"`
-	AssistPlayerID primitive.ObjectID `bson:"assistPlayerId,omitempty" json:"assistPlayerId,omitempty"` // For goals
+	Type     string             `bson:"type" json:"type"` // "goal", "assist"
+	PlayerID primitive.ObjectID `bson:"playerId" json:"playerId"`
 }
 
 type MatchRating struct {
