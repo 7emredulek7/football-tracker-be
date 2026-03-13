@@ -21,7 +21,7 @@ func ConnectDB() {
 
 	dbName := os.Getenv("DB_NAME")
 	if dbName == "" {
-		dbName = "7aside_tracker"
+		dbName = "FootballTracker"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
