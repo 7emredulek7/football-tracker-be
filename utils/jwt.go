@@ -19,7 +19,7 @@ func GenerateToken(userID string, role string, playerID string) (string, error) 
 	claims := jwt.MapClaims{
 		"userId": userID,
 		"role":   role,
-		"exp":    time.Now().Add(time.Hour * 72).Unix(),
+		"exp":    time.Now().Add(time.Hour * 24 * 365).Unix(),
 	}
 	if playerID != "" {
 		claims["playerId"] = playerID
