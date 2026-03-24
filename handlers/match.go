@@ -68,6 +68,9 @@ func CreateMatch(c *gin.Context) {
 	if match.Ratings == nil {
 		match.Ratings = []models.MatchRating{}
 	}
+	if match.Watchers == nil {
+		match.Watchers = []models.WatcherEntry{}
+	}
 
 	collection := config.DB.Collection("matches")
 	_, err := collection.InsertOne(context.Background(), match)
@@ -93,9 +96,11 @@ func UpdateMatch(c *gin.Context) {
 		return
 	}
 
-	// Remove ID so it can't be overwritten
+	// Remove fields that must not be overwritten
 	delete(updateData, "_id")
 	delete(updateData, "id")
+	delete(updateData, "watchers")
+	delete(updateData, "ratings")
 
 	collection := config.DB.Collection("matches")
 	update := bson.M{
@@ -168,7 +173,8 @@ func AddRatings(c *gin.Context) {
 		return
 	}
 	userID, _ := primitive.ObjectIDFromHex(userIdValue.(string))
-	rating.OwnerID = userID
+	rating.OwnerID = &userID
+	rating.RaterType = "player"
 
 	collection := config.DB.Collection("matches")
 

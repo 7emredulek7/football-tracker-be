@@ -11,9 +11,17 @@ type MatchEvent struct {
 	PlayerID primitive.ObjectID `bson:"playerId" json:"playerId"`
 }
 
+type WatcherEntry struct {
+	Name  string `bson:"name"  json:"name"`
+	Token string `bson:"token" json:"token"`
+	Used  bool   `bson:"used"  json:"used"`
+}
+
 type MatchRating struct {
-	OwnerID primitive.ObjectID `bson:"ownerId" json:"userId"`
-	Scores  []PlayerScore      `bson:"scores" json:"scores"`
+	OwnerID     *primitive.ObjectID `bson:"ownerId,omitempty"     json:"userId,omitempty"`
+	WatcherName string              `bson:"watcherName,omitempty" json:"watcherName,omitempty"`
+	RaterType   string              `bson:"raterType"             json:"raterType"` // "player" | "watcher"
+	Scores      []PlayerScore       `bson:"scores"                json:"scores"`
 }
 
 type PlayerScore struct {
@@ -32,7 +40,8 @@ type Match struct {
 	Opponent string             `bson:"opponent" json:"opponent"`
 	Lineup   []LineupEntry      `bson:"lineup" json:"lineup"`
 	Events   []MatchEvent       `bson:"events" json:"events"`
-	Ratings  []MatchRating      `bson:"ratings" json:"ratings"`
-	Score    MatchScore         `bson:"score" json:"score"`
-	Result   string             `bson:"result" json:"result"` // "Win", "Loss", "Draw"
+	Ratings  []MatchRating      `bson:"ratings"  json:"ratings"`
+	Watchers []WatcherEntry     `bson:"watchers" json:"watchers"`
+	Score    MatchScore         `bson:"score"    json:"score"`
+	Result   string             `bson:"result"   json:"result"` // "Win", "Loss", "Draw"
 }

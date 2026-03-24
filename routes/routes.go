@@ -25,6 +25,8 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/settings", handlers.GetSettings)
 		api.GET("/stats/player/:id", handlers.GetPlayerStats)
 		api.GET("/invitations/:token", handlers.GetInvitation)
+		api.GET("/watchers/:token", handlers.GetWatcherContext)
+		api.POST("/watchers/:token/ratings", handlers.SubmitWatcherRatings)
 
 		// Any authenticated user (owner or player)
 		anyAuth := api.Group("/")
@@ -51,6 +53,8 @@ func SetupRoutes(r *gin.Engine) {
 			owner.PUT("/settings/default-lineup", handlers.UpdateSettings)
 
 			owner.POST("/invitations", handlers.CreateInvitation)
+
+			owner.POST("/matches/:id/watchers", handlers.AddWatchers)
 		}
 	}
 }
