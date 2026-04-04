@@ -29,6 +29,8 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/invitations/:token", handlers.GetInvitation)
 		api.GET("/watchers/:token", handlers.GetWatcherContext)
 		api.POST("/watchers/:token/ratings", handlers.SubmitWatcherRatings)
+		api.GET("/guest-ratings/:token", handlers.GetGuestRatingContext)
+		api.POST("/guest-ratings/:token/ratings", handlers.SubmitGuestRating)
 
 		// Any authenticated user (owner or player)
 		anyAuth := api.Group("/")
@@ -57,6 +59,7 @@ func SetupRoutes(r *gin.Engine) {
 			owner.POST("/invitations", handlers.CreateInvitation)
 
 			owner.POST("/matches/:id/watchers", handlers.AddWatchers)
+			owner.POST("/matches/:id/guest-ratings", handlers.GenerateGuestRatingLinks)
 		}
 	}
 }
