@@ -71,6 +71,9 @@ func CreateMatch(c *gin.Context) {
 	if match.Watchers == nil {
 		match.Watchers = []models.WatcherEntry{}
 	}
+	if match.GuestRatingTokens == nil {
+		match.GuestRatingTokens = []models.GuestRatingEntry{}
+	}
 
 	collection := config.DB.Collection("matches")
 	_, err := collection.InsertOne(context.Background(), match)

@@ -60,6 +60,21 @@ func GenerateGuestRatingLinks(c *gin.Context) {
 		return
 	}
 
+	// If guestRatingTokens is null in MongoDB (legacy docs), initialise it to an empty array
+	// so that subsequent $push operations succeed.
+	if match.GuestRatingTokens == nil {
+		_, err := collection.UpdateOne(
+			context.Background(),
+			bson.M{"_id": matchID},
+			bson.M{"$set": bson.M{"guestRatingTokens": []models.GuestRatingEntry{}}},
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialise guest rating tokens"})
+			return
+		}
+		match.GuestRatingTokens = []models.GuestRatingEntry{}
+	}
+
 	existingTokens := make(map[string]bool)
 	for _, entry := range match.GuestRatingTokens {
 		existingTokens[entry.PlayerID.Hex()] = true
