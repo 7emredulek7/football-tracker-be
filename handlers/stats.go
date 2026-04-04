@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/user/7aside-tracker/config"
@@ -90,4 +91,122 @@ func GetPlayerStats(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, stats)
+}
+
+type WeeklyStarPlayer struct {
+	PlayerID  string  `json:"playerId"`
+	AvgRating float64 `json:"avgRating,omitempty"`
+	Goals     int     `json:"goals,omitempty"`
+	Assists   int     `json:"assists,omitempty"`
+}
+
+type WeeklyStars struct {
+	HasMatches    bool              `json:"hasMatches"`
+	PlayerOfWeek  *WeeklyStarPlayer `json:"playerOfWeek"`
+	TopScorer     *WeeklyStarPlayer `json:"topScorer"`
+	TopAssister   *WeeklyStarPlayer `json:"topAssister"`
+}
+
+func GetWeeklyStars(c *gin.Context) {
+	collection := config.DB.Collection("matches")
+	var matches []models.Match
+
+	cursor, err := collection.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch matches"})
+		return
+	}
+	defer cursor.Close(context.Background())
+	if err = cursor.All(context.Background(), &matches); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode matches"})
+		return
+	}
+
+	now := time.Now().UTC()
+	// ISO week: Monday = day 1
+	weekday := int(now.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+	weekStart := now.AddDate(0, 0, -(weekday - 1)).Truncate(24 * time.Hour)
+	weekEnd := weekStart.AddDate(0, 0, 7)
+
+	var weekMatches []models.Match
+	for _, m := range matches {
+		if !m.Date.Before(weekStart) && m.Date.Before(weekEnd) {
+			weekMatches = append(weekMatches, m)
+		}
+	}
+
+	if len(weekMatches) == 0 {
+		c.JSON(http.StatusOK, WeeklyStars{HasMatches: false})
+		return
+	}
+
+	// Player of the Week: highest average rating
+	type ratingAcc struct{ total, count int }
+	ratingSums := map[primitive.ObjectID]*ratingAcc{}
+	for _, m := range weekMatches {
+		for _, r := range m.Ratings {
+			for _, s := range r.Scores {
+				if _, ok := ratingSums[s.PlayerID]; !ok {
+					ratingSums[s.PlayerID] = &ratingAcc{}
+				}
+				ratingSums[s.PlayerID].total += s.Score
+				ratingSums[s.PlayerID].count++
+			}
+		}
+	}
+
+	var playerOfWeek *WeeklyStarPlayer
+	var bestAvg float64 = -1
+	for pid, acc := range ratingSums {
+		avg := float64(acc.total) / float64(acc.count)
+		if avg > bestAvg {
+			bestAvg = avg
+			id := pid.Hex()
+			playerOfWeek = &WeeklyStarPlayer{PlayerID: id, AvgRating: avg}
+		}
+	}
+
+	// Top Scorer & Top Assister
+	goalCounts := map[primitive.ObjectID]int{}
+	assistCounts := map[primitive.ObjectID]int{}
+	for _, m := range weekMatches {
+		for _, ev := range m.Events {
+			switch ev.Type {
+			case "goal":
+				goalCounts[ev.PlayerID]++
+			case "assist":
+				assistCounts[ev.PlayerID]++
+			}
+		}
+	}
+
+	var topScorer *WeeklyStarPlayer
+	var maxGoals int
+	for pid, goals := range goalCounts {
+		if goals > maxGoals {
+			maxGoals = goals
+			id := pid.Hex()
+			topScorer = &WeeklyStarPlayer{PlayerID: id, Goals: goals}
+		}
+	}
+
+	var topAssister *WeeklyStarPlayer
+	var maxAssists int
+	for pid, assists := range assistCounts {
+		if assists > maxAssists {
+			maxAssists = assists
+			id := pid.Hex()
+			topAssister = &WeeklyStarPlayer{PlayerID: id, Assists: assists}
+		}
+	}
+
+	c.JSON(http.StatusOK, WeeklyStars{
+		HasMatches:   true,
+		PlayerOfWeek: playerOfWeek,
+		TopScorer:    topScorer,
+		TopAssister:  topAssister,
+	})
 }

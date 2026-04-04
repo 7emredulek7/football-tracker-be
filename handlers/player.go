@@ -35,6 +35,115 @@ func GetPlayers(c *gin.Context) {
 	c.JSON(http.StatusOK, players)
 }
 
+func GetPlayersWithStats(c *gin.Context) {
+	playersCol := config.DB.Collection("players")
+	matchesCol := config.DB.Collection("matches")
+
+	var players []models.Player
+	cursor, err := playersCol.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch players"})
+		return
+	}
+	defer cursor.Close(context.Background())
+	if err = cursor.All(context.Background(), &players); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode players"})
+		return
+	}
+
+	var matches []models.Match
+	mCursor, err := matchesCol.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch matches"})
+		return
+	}
+	defer mCursor.Close(context.Background())
+	if err = mCursor.All(context.Background(), &matches); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode matches"})
+		return
+	}
+
+	type statAcc struct {
+		Goals        int
+		Assists      int
+		MatchPlayed  int
+		TotalRating  float64
+		RatingCount  int
+	}
+
+	statsMap := map[primitive.ObjectID]*statAcc{}
+	for _, p := range players {
+		statsMap[p.ID] = &statAcc{}
+	}
+
+	for _, m := range matches {
+		playedSet := map[primitive.ObjectID]bool{}
+		for _, li := range m.Lineup {
+			if _, ok := statsMap[li.PlayerID]; ok {
+				if !playedSet[li.PlayerID] {
+					statsMap[li.PlayerID].MatchPlayed++
+					playedSet[li.PlayerID] = true
+				}
+			}
+		}
+
+		for _, ev := range m.Events {
+			if acc, ok := statsMap[ev.PlayerID]; ok {
+				switch ev.Type {
+				case "goal":
+					acc.Goals++
+				case "assist":
+					acc.Assists++
+				}
+			}
+		}
+
+		// Ratings: accumulate per-match average for each player
+		matchRatings := map[primitive.ObjectID]struct{ total, count int }{}
+		for _, r := range m.Ratings {
+			for _, s := range r.Scores {
+				if _, ok := statsMap[s.PlayerID]; ok {
+					entry := matchRatings[s.PlayerID]
+					entry.total += s.Score
+					entry.count++
+					matchRatings[s.PlayerID] = entry
+				}
+			}
+		}
+		for pid, mr := range matchRatings {
+			if mr.count > 0 {
+				statsMap[pid].TotalRating += float64(mr.total) / float64(mr.count)
+				statsMap[pid].RatingCount++
+			}
+		}
+	}
+
+	type PlayerWithStats struct {
+		models.Player
+		Stats struct {
+			Goals         int     `json:"goals"`
+			Assists       int     `json:"assists"`
+			MatchesPlayed int     `json:"matchesPlayed"`
+			AverageRating float64 `json:"averageRating"`
+		} `json:"stats"`
+	}
+
+	result := make([]PlayerWithStats, len(players))
+	for i, p := range players {
+		acc := statsMap[p.ID]
+		result[i].Player = p
+		result[i].Stats.Goals = acc.Goals
+		result[i].Stats.Assists = acc.Assists
+		result[i].Stats.MatchesPlayed = acc.MatchPlayed
+		if acc.RatingCount > 0 {
+			result[i].Stats.AverageRating = acc.TotalRating / float64(acc.RatingCount)
+		}
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+
 func CreatePlayer(c *gin.Context) {
 	var player models.Player
 	if err := c.ShouldBindJSON(&player); err != nil {
