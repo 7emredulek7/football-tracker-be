@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +13,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+type PlayerWithStats struct {
+	models.Player
+	Stats PlayerStats `json:"stats"`
+}
 
 func GetPlayers(c *gin.Context) {
 	collection := config.DB.Collection("players")
@@ -64,11 +71,11 @@ func GetPlayersWithStats(c *gin.Context) {
 	}
 
 	type statAcc struct {
-		Goals        int
-		Assists      int
-		MatchPlayed  int
-		TotalRating  float64
-		RatingCount  int
+		Goals       int
+		Assists     int
+		MatchPlayed int
+		TotalRating float64
+		RatingCount int
 	}
 
 	statsMap := map[primitive.ObjectID]*statAcc{}
@@ -118,16 +125,6 @@ func GetPlayersWithStats(c *gin.Context) {
 		}
 	}
 
-	type PlayerWithStats struct {
-		models.Player
-		Stats struct {
-			Goals         int     `json:"goals"`
-			Assists       int     `json:"assists"`
-			MatchesPlayed int     `json:"matchesPlayed"`
-			AverageRating float64 `json:"averageRating"`
-		} `json:"stats"`
-	}
-
 	result := make([]PlayerWithStats, len(players))
 	for i, p := range players {
 		acc := statsMap[p.ID]
@@ -140,9 +137,38 @@ func GetPlayersWithStats(c *gin.Context) {
 		}
 	}
 
+	sortPlayersWithStats(result)
+
 	c.JSON(http.StatusOK, result)
 }
 
+func sortPlayersWithStats(players []PlayerWithStats) {
+	sort.SliceStable(players, func(i, j int) bool {
+		left := players[i]
+		right := players[j]
+
+		if left.IsGuest != right.IsGuest {
+			return !left.IsGuest
+		}
+		if left.Stats.AverageRating != right.Stats.AverageRating {
+			return left.Stats.AverageRating > right.Stats.AverageRating
+		}
+		if left.Stats.MatchesPlayed != right.Stats.MatchesPlayed {
+			return left.Stats.MatchesPlayed > right.Stats.MatchesPlayed
+		}
+		if left.Number != right.Number {
+			return left.Number < right.Number
+		}
+
+		leftName := strings.ToLower(strings.TrimSpace(left.FirstName + " " + left.LastName))
+		rightName := strings.ToLower(strings.TrimSpace(right.FirstName + " " + right.LastName))
+		if leftName != rightName {
+			return leftName < rightName
+		}
+
+		return left.ID.Hex() < right.ID.Hex()
+	})
+}
 
 func CreatePlayer(c *gin.Context) {
 	var player models.Player
