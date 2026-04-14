@@ -156,8 +156,10 @@ func sortPlayersWithStats(players []PlayerWithStats) {
 		if left.Stats.MatchesPlayed != right.Stats.MatchesPlayed {
 			return left.Stats.MatchesPlayed > right.Stats.MatchesPlayed
 		}
-		if left.Number != right.Number {
-			return left.Number < right.Number
+		leftNumber := playerNumberForSort(left.Number)
+		rightNumber := playerNumberForSort(right.Number)
+		if leftNumber != rightNumber {
+			return leftNumber < rightNumber
 		}
 
 		leftName := strings.ToLower(strings.TrimSpace(left.FirstName + " " + left.LastName))
@@ -170,10 +172,24 @@ func sortPlayersWithStats(players []PlayerWithStats) {
 	})
 }
 
+func playerNumberForSort(number *int) int {
+	if number == nil {
+		return int(^uint(0) >> 1)
+	}
+	return *number
+}
+
 func CreatePlayer(c *gin.Context) {
 	var player models.Player
 	if err := c.ShouldBindJSON(&player); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if player.IsGuest {
+		player.Number = nil
+	} else if player.Number == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Jersey number is required for non-guest players"})
 		return
 	}
 
@@ -201,7 +217,7 @@ func UpdatePlayer(c *gin.Context) {
 	var updateData struct {
 		FirstName string `json:"firstName"`
 		LastName  string `json:"lastName"`
-		Number    int    `json:"number"`
+		Number    *int   `json:"number"`
 		IsGuest   bool   `json:"isGuest"`
 	}
 
@@ -211,13 +227,23 @@ func UpdatePlayer(c *gin.Context) {
 	}
 
 	collection := config.DB.Collection("players")
+	setFields := bson.M{
+		"firstName": updateData.FirstName,
+		"lastName":  updateData.LastName,
+		"isGuest":   updateData.IsGuest,
+	}
 	update := bson.M{
-		"$set": bson.M{
-			"firstName": updateData.FirstName,
-			"lastName":  updateData.LastName,
-			"number":    updateData.Number,
-			"isGuest":   updateData.IsGuest,
-		},
+		"$set": setFields,
+	}
+
+	if updateData.IsGuest {
+		update["$unset"] = bson.M{"number": ""}
+	} else {
+		if updateData.Number == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Jersey number is required for non-guest players"})
+			return
+		}
+		setFields["number"] = *updateData.Number
 	}
 
 	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": objectID}, update)

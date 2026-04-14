@@ -10,7 +10,7 @@ type Player struct {
 	ID        primitive.ObjectID  `bson:"_id,omitempty" json:"id"`
 	FirstName string              `bson:"firstName" json:"firstName"`
 	LastName  string              `bson:"lastName" json:"lastName"`
-	Number    int                 `bson:"number" json:"number"`
+	Number    *int                `bson:"number,omitempty" json:"number,omitempty"`
 	IsGuest   bool                `bson:"isGuest" json:"isGuest"`
 	UserID    *primitive.ObjectID `bson:"userId,omitempty" json:"userId,omitempty"`
 	CreatedAt time.Time           `bson:"createdAt" json:"createdAt"`
