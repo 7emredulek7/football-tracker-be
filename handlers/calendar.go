@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -21,6 +23,10 @@ type calendarMatchPayload struct {
 
 type calendarDatePayload struct {
 	Date time.Time `json:"date" binding:"required"`
+}
+
+type optionalCalendarDatePayload struct {
+	Date *time.Time `json:"date"`
 }
 
 func GetCalendarRequests(c *gin.Context) {
@@ -119,9 +125,17 @@ func AcceptCalendarRequest(c *gin.Context) {
 		return
 	}
 
+	payload, ok := bindOptionalCalendarDatePayload(c)
+	if !ok {
+		return
+	}
+
 	matchDate := request.RequestedDate
 	if request.ScheduledDate != nil {
 		matchDate = *request.ScheduledDate
+	}
+	if payload.Date != nil {
+		matchDate = *payload.Date
 	}
 
 	match := newCalendarMatch(request.Opponent, matchDate)
@@ -135,9 +149,10 @@ func AcceptCalendarRequest(c *gin.Context) {
 	now := time.Now().UTC()
 	update := bson.M{
 		"$set": bson.M{
-			"status":    models.CalendarRequestStatusAccepted,
-			"matchId":   match.ID,
-			"updatedAt": now,
+			"status":        models.CalendarRequestStatusAccepted,
+			"scheduledDate": matchDate,
+			"matchId":       match.ID,
+			"updatedAt":     now,
 		},
 	}
 
@@ -147,6 +162,7 @@ func AcceptCalendarRequest(c *gin.Context) {
 	}
 
 	request.Status = models.CalendarRequestStatusAccepted
+	request.ScheduledDate = &matchDate
 	request.MatchID = &match.ID
 	request.UpdatedAt = now
 
@@ -231,6 +247,23 @@ func bindCalendarDatePayload(c *gin.Context) (calendarDatePayload, bool) {
 	}
 
 	if !validateHourlyDate(c, payload.Date) {
+		return payload, false
+	}
+
+	return payload, true
+}
+
+func bindOptionalCalendarDatePayload(c *gin.Context) (optionalCalendarDatePayload, bool) {
+	var payload optionalCalendarDatePayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		if errors.Is(err, io.EOF) {
+			return payload, true
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return payload, false
+	}
+
+	if payload.Date != nil && !validateHourlyDate(c, *payload.Date) {
 		return payload, false
 	}
 
