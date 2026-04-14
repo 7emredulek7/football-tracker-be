@@ -31,6 +31,8 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/watchers/:token/ratings", handlers.SubmitWatcherRatings)
 		api.GET("/guest-ratings/:token", handlers.GetGuestRatingContext)
 		api.POST("/guest-ratings/:token/ratings", handlers.SubmitGuestRating)
+		api.POST("/calendar/requests", handlers.CreateCalendarRequest)
+		api.GET("/calendar/public-requests", handlers.GetPublicCalendarRequests)
 
 		// Any authenticated user (owner or player)
 		anyAuth := api.Group("/")
@@ -60,6 +62,12 @@ func SetupRoutes(r *gin.Engine) {
 
 			owner.POST("/matches/:id/watchers", handlers.AddWatchers)
 			owner.POST("/matches/:id/guest-ratings", handlers.GenerateGuestRatingLinks)
+
+			owner.GET("/calendar/requests", handlers.GetCalendarRequests)
+			owner.POST("/calendar/matches", handlers.CreateCalendarMatch)
+			owner.PUT("/calendar/requests/:id/accept", handlers.AcceptCalendarRequest)
+			owner.PUT("/calendar/requests/:id/reject", handlers.RejectCalendarRequest)
+			owner.PUT("/calendar/requests/:id/reschedule", handlers.RescheduleCalendarRequest)
 		}
 	}
 }
